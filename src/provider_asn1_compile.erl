@@ -1,5 +1,4 @@
 -module('provider_asn1_compile').
--behaviour(provider).
 
 -export([init/1, do/1, format_error/1]).
 
