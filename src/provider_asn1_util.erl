@@ -3,7 +3,6 @@
 -export([verbose_out/3,
          format_error/1,
          move_file/4,
-         delete_files/3,
          delete_file/3,
          resolve_args/2,
          get_args/1,
@@ -35,16 +34,18 @@ move_file(State, SrcPath, File, DestPath) ->
             ok
     end.
 
-delete_files(State, In, Pattern) ->
-    lists:foreach(fun(File) ->
-                          delete_file(State, In, File)
-                  end,
-                  filelib:wildcard(Pattern, In)).
-
 delete_file(State, In, File) ->
     F = filename:join(In, File),
+    delete_file(State, F).
+
+delete_file(State, F) ->
     verbose_out(State, "Deleting: ~p", [F]),
-    verbose_out(State, "~p", [ok = file:delete(F)]).
+    case file:delete(F) of
+        ok ->
+            verbose_out(State, "ok", []);
+        {error, enoent} ->
+            verbose_out(State, "ok - enoent", [])
+    end.
 
 resolve_args(State, Defaults) ->
     {PArgs, _} = rebar_state:command_parsed_args(State),

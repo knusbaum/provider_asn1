@@ -50,7 +50,7 @@ do(PreState) ->
 
 
 do_clean(State, AppPath) ->
-    rebar_api:info("Cleaning ASN.1 generated files.", []),
+    rebar_api:info("Cleaning ASN.1 generated files in ~p.", [AppPath]),
 
     AsnPath = filename:join(AppPath, "asn1"),
     IncludePath = filename:join(AppPath, "include"),
