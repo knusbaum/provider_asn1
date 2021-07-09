@@ -3,14 +3,6 @@
 
 -export([init/1, do/1, format_error/1]).
 
--import(provider_asn1_util, 
-        [verbose_out/3,
-         move_files/4,
-         move_file/4,
-         delete_files/3,
-         delete_file/3,
-         resolve_args/2]).
-
 -define(PROVIDER, 'clean').
 -define(DEPS, [{default, app_discovery}]).
 -define(DEFAULTS, [{verbose, false}]).
@@ -36,7 +28,7 @@ init(State) ->
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(PreState) ->
-    State = resolve_args(PreState, ?DEFAULTS),
+    State = provider_asn1_util:resolve_args(PreState, ?DEFAULTS),
     Apps = lists:map(fun (App) -> rebar_app_info:dir(App) end,
                      rebar_state:project_apps(State)),
     AllApps =
@@ -57,24 +49,24 @@ do_clean(State, AppPath) ->
     SrcPath = filename:join(AppPath, "src"),
 
     ErlFiles = filelib:wildcard("*.erl", GenPath),
-    verbose_out(State, "Erl files: ~p", [ErlFiles]),
+    provider_asn1_util:verbose_out(State, "Erl files: ~p", [ErlFiles]),
     lists:foreach(fun(File) ->
-                          delete_file(State, SrcPath, File)
+                          provider_asn1_util:delete_file(State, SrcPath, File)
                   end, ErlFiles),
 
     HrlFiles = filelib:wildcard("*.hrl", GenPath),
-    verbose_out(State, "Hrl files: ~p", [HrlFiles]),
+    provider_asn1_util:verbose_out(State, "Hrl files: ~p", [HrlFiles]),
     lists:foreach(fun(File) ->
-                          delete_file(State, IncludePath, File)
+                          provider_asn1_util:delete_file(State, IncludePath, File)
                   end, HrlFiles),
 
     DBFiles = filelib:wildcard("*.asn1db", GenPath),
-    verbose_out(State, "DB files: ~p", [DBFiles]),
+    provider_asn1_util:verbose_out(State, "DB files: ~p", [DBFiles]),
     lists:foreach(fun(File) ->
-                          delete_file(State, SrcPath, File)
+                          provider_asn1_util:delete_file(State, SrcPath, File)
                   end, DBFiles),
 
-    delete_files(State, GenPath, "*"),
+    provider_asn1_util:delete_files(State, GenPath, "*"),
 
     ok.
 

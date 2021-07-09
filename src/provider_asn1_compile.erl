@@ -3,17 +3,6 @@
 
 -export([init/1, do/1, format_error/1]).
 
--import(provider_asn1_util,
-        [verbose_out/3,
-         move_files/4,
-         move_file/4,
-         delete_files/3,
-         delete_file/3,
-         resolve_args/2,
-         get_args/1,
-         get_arg/2,
-         set_arg/3]).
-
 -define(PROVIDER, 'compile').
 -define(DEPS, [{default, app_discovery}]).
 -define(DEFAULTS, [{verbose, false}, {encoding, ber}, {compile_opts, []}]).
@@ -40,14 +29,14 @@ init(State) ->
     {ok, rebar_state:add_provider(State, Provider)}.
 
 resolve_special_args(PreState) ->
-    NewState = resolve_args(PreState, ?DEFAULTS),
-    CompileOpts = get_arg(NewState, compile_opts),
+    NewState = provider_asn1_util:resolve_args(PreState, ?DEFAULTS),
+    CompileOpts = provider_asn1_util:get_arg(NewState, compile_opts),
     if
         is_binary(CompileOpts) ->
             NewCompileOpts = lists:map(fun(X) ->
                                                binary_to_atom(X, utf8) end,
                                        re:split(CompileOpts, ",")),
-            set_arg(NewState, compile_opts, NewCompileOpts);
+            provider_asn1_util:set_arg(NewState, compile_opts, NewCompileOpts);
         true -> NewState
     end.
 
@@ -76,18 +65,18 @@ process_app(State, AppPath) ->
         [] ->
             ok;
         Asns ->
-            verbose_out(State, "    Asns: ~p", [Asns]),
-            verbose_out(State, "Making ~p ~p~n", [GenPath, file:make_dir(GenPath)]),
+            provider_asn1_util:verbose_out(State, "    Asns: ~p", [Asns]),
+            provider_asn1_util:verbose_out(State, "Making ~p ~p~n", [GenPath, file:make_dir(GenPath)]),
             lists:foreach(fun(AsnFile) -> generate_asn(State, GenPath, AsnFile) end, Asns),
 
-            verbose_out(State, "ERL files: ~p", [filelib:wildcard("*.erl", GenPath)]),
-            move_files(State, GenPath, SrcPath, "*.erl"),
+            provider_asn1_util:verbose_out(State, "ERL files: ~p", [filelib:wildcard("*.erl", GenPath)]),
+            provider_asn1_util:move_files(State, GenPath, SrcPath, "*.erl"),
 
-            verbose_out(State, "DB files: ~p", [filelib:wildcard("*.asn1db", GenPath)]),
-            move_files(State, GenPath, SrcPath, "*.asn1db"),
+            provider_asn1_util:verbose_out(State, "DB files: ~p", [filelib:wildcard("*.asn1db", GenPath)]),
+            provider_asn1_util:move_files(State, GenPath, SrcPath, "*.asn1db"),
 
-            verbose_out(State, "HEADER files: ~p", [filelib:wildcard("*.hrl", GenPath)]),
-            move_files(State, GenPath, IncludePath, "*.hrl"),
+            provider_asn1_util:verbose_out(State, "HEADER files: ~p", [filelib:wildcard("*.hrl", GenPath)]),
+            provider_asn1_util:move_files(State, GenPath, IncludePath, "*.hrl"),
 
             ok
     end.
@@ -100,15 +89,15 @@ find_asn_files(Path) ->
 
 generate_asn(State, Path, AsnFile) ->
     rebar_api:info("Generating ASN.1 files.", []),
-    Args = get_args(State),
-    verbose_out(State, "Args: ~p", [Args]),
+    Args = provider_asn1_util:get_args(State),
+    provider_asn1_util:verbose_out(State, "Args: ~p", [Args]),
     Encoding = proplists:get_value(encoding, Args),
     CompileArgs =
         case proplists:get_value(verbose, Args) of
             true -> [Encoding, verbose, {outdir, Path}];
             _ -> [Encoding, {outdir, Path}]
         end ++ proplists:get_value(compile_opts, Args),
-    verbose_out(State, "Beginning compile with opts: ~p", [CompileArgs]),
+    provider_asn1_util:verbose_out(State, "Beginning compile with opts: ~p", [CompileArgs]),
     asn1ct:compile(AsnFile, CompileArgs).
 
 to_recompile(ASNPath, GenPath) ->
