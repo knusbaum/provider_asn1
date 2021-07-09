@@ -2,8 +2,7 @@
 
 -export([verbose_out/3,
          format_error/1,
-         move_files/4,
-         move_file/4,
+         copy_file/4,
          delete_files/3,
          delete_file/3,
          resolve_args/2,
@@ -24,16 +23,16 @@ verbose_out(State, FormatString, Args)->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-move_files(State, From, To, Pattern) ->
-    verbose_out(State, "Making ~p ~p~n", [To, file:make_dir(To)]),
-    lists:foreach(fun(File) -> move_file(State, From, File, To) end,
-                  filelib:wildcard(Pattern, From)).
-
-move_file(State, SrcPath, File, DestPath) ->
+copy_file(State, SrcPath, File, DestPath) ->
     F = filename:join(SrcPath, File),
-    Dest = filename:join(DestPath, File),
-    verbose_out(State, "Moving: ~p", [F]),
-    verbose_out(State, "~p", [file:copy(F, Dest)]).
+    case filelib:is_file(F) of
+        true ->
+            Dest = filename:join(DestPath, File),
+            verbose_out(State, "Copying: ~p", [F]),
+            verbose_out(State, "~p", [file:copy(F, Dest)]);
+        false ->
+            ok
+    end.
 
 delete_files(State, In, Pattern) ->
     lists:foreach(fun(File) ->
