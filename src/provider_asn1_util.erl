@@ -50,8 +50,8 @@ resolve_args(State, Defaults) ->
     {PArgs, _} = rebar_state:command_parsed_args(State),
     Config = rebar_state:get(State, asn1_args, []),
 
-    PArgsMap = maps:from_list(PArgs),
-    ConfigMap = maps:from_list(Config),
+    PArgsMap = maps:from_list(proplists:unfold(PArgs)),
+    ConfigMap = maps:from_list(proplists:unfold(Config)),
     DefaultsMap = maps:from_list(Defaults),
 
     % Defaults overridden by Config overridden by PArgs (command-line)
