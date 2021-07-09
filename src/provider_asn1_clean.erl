@@ -52,29 +52,17 @@ do(PreState) ->
 do_clean(State, AppPath) ->
     rebar_api:info("Cleaning ASN.1 generated files.", []),
 
-    GenPath = filename:join(AppPath, "asngen"),
+    AsnPath = filename:join(AppPath, "asn1"),
     IncludePath = filename:join(AppPath, "include"),
     SrcPath = filename:join(AppPath, "src"),
 
-    ErlFiles = filelib:wildcard("*.erl", GenPath),
-    verbose_out(State, "Erl files: ~p", [ErlFiles]),
-    lists:foreach(fun(File) ->
-                          delete_file(State, SrcPath, File)
-                  end, ErlFiles),
-
-    HrlFiles = filelib:wildcard("*.hrl", GenPath),
-    verbose_out(State, "Hrl files: ~p", [HrlFiles]),
-    lists:foreach(fun(File) ->
-                          delete_file(State, IncludePath, File)
-                  end, HrlFiles),
-
-    DBFiles = filelib:wildcard("*.asn1db", GenPath),
-    verbose_out(State, "DB files: ~p", [DBFiles]),
-    lists:foreach(fun(File) ->
-                          delete_file(State, SrcPath, File)
-                  end, DBFiles),
-
-    delete_files(State, GenPath, "*"),
+    Asns = filelib:wildcard("**/*.asn1", AsnPath),
+    lists:foreach(
+        fun(AsnFile) ->
+            Base = filename:basename(AsnFile, ".asn1"),
+            provider_asn1_util:delete_file(State, SrcPath, Base ++ ".erl"),
+            provider_asn1_util:delete_file(State, IncludePath, Base ++ ".hrl")
+        end, Asns),
 
     ok.
 

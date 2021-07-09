@@ -70,23 +70,27 @@ process_app(State, AppPath) ->
     GenPath = filename:join(AppPath, "asngen"),
     IncludePath = filename:join(AppPath, "include"),
     SrcPath = filename:join(AppPath, "src"),
-    ensure_dir(State, GenPath),
-    ensure_dir(State, IncludePath),
     ensure_dir(State, SrcPath),
 
     case to_recompile(ASNPath, GenPath) of
         [] ->
             ok;
         Asns ->
-            verbose_out(State, "    Asns: ~p", [Asns]),
-            lists:foreach(fun(AsnFile) ->
-                                  generate_asn(State, GenPath, AsnFile),
-                                  Base = filename:basename(AsnFile, ".asn1"),
-                                  provider_asn1_util:copy_file(State, GenPath, Base ++ ".erl", SrcPath),
-                                  provider_asn1_util:copy_file(State, GenPath, Base ++ ".asn1db", SrcPath),
-                                  provider_asn1_util:copy_file(State, GenPath, Base ++ ".hrl", IncludePath)
-                          end, Asns)
+            ensure_dir(State, GenPath),
+            ensure_dir(State, IncludePath),
+            lists:foreach(fun(AsnFile) -> generate_asn(State, GenPath, AsnFile) end, Asns),
+            move_asns(State, GenPath, SrcPath, IncludePath, Asns)
     end.
+
+move_asns(State, GenPath, SrcPath, IncludePath, Asns) ->
+    lists:foreach(
+      fun(AsnFile) ->
+              Base = filename:basename(AsnFile, ".asn1"),
+              provider_asn1_util:move_file(State, GenPath, Base ++ ".erl", SrcPath),
+              provider_asn1_util:delete_file(State, GenPath, Base ++ ".asn1db"),
+              provider_asn1_util:move_file(State, GenPath, Base ++ ".hrl", IncludePath)
+      end, Asns),
+    ok = file:del_dir(GenPath).
 
 format_error(Reason) ->
     provider_asn1_util:format_error(Reason).
@@ -97,7 +101,7 @@ generate_asn(State, Path, AsnFile) ->
     provider_asn1_util:verbose_out(State, "Args: ~p", [Args]),
     Encoding = proplists:get_value(encoding, Args),
     Verbose = proplists:get_value(verbose, Args),
-    CompileArgs = [verbose || Verbose] ++ [Encoding, {outdir, Path}]
+    CompileArgs = [verbose || Verbose] ++ [noobj, Encoding, {outdir, Path}]
         ++ proplists:get_value(compile_opts, Args),
     verbose_out(State, "Beginning compile with opts: ~p", [CompileArgs]),
     case asn1ct:compile(AsnFile, CompileArgs) of

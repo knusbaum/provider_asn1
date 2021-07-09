@@ -2,7 +2,7 @@
 
 -export([verbose_out/3,
          format_error/1,
-         copy_file/4,
+         move_file/4,
          delete_files/3,
          delete_file/3,
          resolve_args/2,
@@ -23,14 +23,15 @@ verbose_out(State, FormatString, Args)->
 format_error(Reason) ->
     io_lib:format("~p", [Reason]).
 
-copy_file(State, SrcPath, File, DestPath) ->
+move_file(State, SrcPath, File, DestPath) ->
     F = filename:join(SrcPath, File),
     case filelib:is_file(F) of
         true ->
             Dest = filename:join(DestPath, File),
-            verbose_out(State, "Copying: ~p", [F]),
-            verbose_out(State, "~p", [file:copy(F, Dest)]);
+            verbose_out(State, "Moving: ~p", [F]),
+            verbose_out(State, "~p", [ok = file:rename(F, Dest)]);
         false ->
+            verbose_out(State, "Not a file: ~p", [F]),
             ok
     end.
 
@@ -43,7 +44,7 @@ delete_files(State, In, Pattern) ->
 delete_file(State, In, File) ->
     F = filename:join(In, File),
     verbose_out(State, "Deleting: ~p", [F]),
-    verbose_out(State, "~p", [file:delete(F)]).
+    verbose_out(State, "~p", [ok = file:delete(F)]).
 
 resolve_args(State, Defaults) ->
     {PArgs, _} = rebar_state:command_parsed_args(State),
