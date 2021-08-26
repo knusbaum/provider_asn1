@@ -43,8 +43,7 @@ resolve_special_args(PreState) ->
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
 do(PreState) ->
     State = resolve_special_args(PreState),
-
-    Apps = lists:map(fun (App) -> rebar_app_info:dir(App) end,
+    Apps = lists:map(fun rebar_app_info:dir/1,
                      rebar_state:project_apps(State)),
     AllApps =
         case lists:member(rebar_state:dir(State), Apps) of
@@ -60,66 +59,66 @@ process_app(State, AppPath) ->
     GenPath = filename:join(AppPath, "asngen"),
     IncludePath = filename:join(AppPath, "include"),
     SrcPath = filename:join(AppPath, "src"),
+    ensure_dir(State, SrcPath),
 
     case to_recompile(ASNPath, GenPath) of
         [] ->
             ok;
         Asns ->
-            provider_asn1_util:verbose_out(State, "    Asns: ~p", [Asns]),
-            provider_asn1_util:verbose_out(State, "Making ~p ~p~n", [GenPath, file:make_dir(GenPath)]),
+            ensure_dir(State, GenPath),
+            ensure_dir(State, IncludePath),
             lists:foreach(fun(AsnFile) -> generate_asn(State, GenPath, AsnFile) end, Asns),
-
-            provider_asn1_util:verbose_out(State, "ERL files: ~p", [filelib:wildcard("*.erl", GenPath)]),
-            provider_asn1_util:move_files(State, GenPath, SrcPath, "*.erl"),
-
-            provider_asn1_util:verbose_out(State, "DB files: ~p", [filelib:wildcard("*.asn1db", GenPath)]),
-            provider_asn1_util:move_files(State, GenPath, SrcPath, "*.asn1db"),
-
-            provider_asn1_util:verbose_out(State, "HEADER files: ~p", [filelib:wildcard("*.hrl", GenPath)]),
-            provider_asn1_util:move_files(State, GenPath, IncludePath, "*.hrl"),
-
-            ok
+            move_asns(State, GenPath, SrcPath, IncludePath, Asns)
     end.
+
+move_asns(State, GenPath, SrcPath, IncludePath, Asns) ->
+    lists:foreach(
+      fun(AsnFile) ->
+              Base = filename:basename(AsnFile, ".asn1"),
+              provider_asn1_util:move_file(State, GenPath, Base ++ ".erl", SrcPath),
+              provider_asn1_util:delete_file(State, GenPath, Base ++ ".asn1db"),
+              provider_asn1_util:move_file(State, GenPath, Base ++ ".hrl", IncludePath)
+      end, Asns),
+    ok = file:del_dir(GenPath).
 
 format_error(Reason) ->
     provider_asn1_util:format_error(Reason).
 
-find_asn_files(Path) ->
-    [filename:join(Path, F) || F <- filelib:wildcard("**/*.asn1", Path)].
-
 generate_asn(State, Path, AsnFile) ->
-    rebar_api:info("Generating ASN.1 files.", []),
+    rebar_api:info("~s", [AsnFile]),
     Args = provider_asn1_util:get_args(State),
     provider_asn1_util:verbose_out(State, "Args: ~p", [Args]),
     Encoding = proplists:get_value(encoding, Args),
-    CompileArgs =
-        case proplists:get_value(verbose, Args) of
-            true -> [Encoding, verbose, {outdir, Path}];
-            _ -> [Encoding, {outdir, Path}]
-        end ++ proplists:get_value(compile_opts, Args),
+    Verbose = proplists:get_value(verbose, Args),
+    CompileArgs = [verbose || Verbose] ++ [noobj, Encoding, {outdir, Path}]
+        ++ proplists:get_value(compile_opts, Args),
     provider_asn1_util:verbose_out(State, "Beginning compile with opts: ~p", [CompileArgs]),
-    asn1ct:compile(AsnFile, CompileArgs).
-
-to_recompile(ASNPath, GenPath) ->
-    case find_asn_files(ASNPath) of
-        [] ->
-            [];
-        ASNFileNames ->
-            case is_updated(ASNFileNames, ASNPath, GenPath) of
-                true -> ASNFileNames;
-                false -> []
-            end
+    case asn1ct:compile(AsnFile, CompileArgs) of
+        {error, E} ->
+            provider_asn1_util:verbose_out(State, "Error ~p compiling ASN1 ~p~n", [E, AsnFile]);
+        ok ->
+            ok
     end.
 
-is_updated([], _, _) ->
-    false;
-is_updated([ASNFileName | RestFiles], ASNPath, GenPath) ->
+ensure_dir(State, Path) ->
+    case filelib:is_dir(Path) of
+        true ->
+            ok;
+        false ->
+            provider_asn1_util:verbose_out(State, "Making ~p ~p~n", [Path, file:make_dir(Path)])
+    end.
+
+to_recompile(ASNPath, GenPath) ->
+    lists:filtermap(fun (File) ->
+                            is_latest(File, ASNPath, GenPath)
+                    end,
+                    find_asn_files(ASNPath)).
+
+find_asn_files(Path) ->
+    [filename:join(Path, F) || F <- filelib:wildcard("**/*.asn1", Path)].
+
+is_latest(ASNFileName, ASNPath, GenPath) ->
     Source = filename:join(ASNPath, ASNFileName),
     TargetFileName = filename:basename(ASNFileName, ".asn1") ++ ".erl",
     Target = filename:join(GenPath, TargetFileName),
-    case filelib:last_modified(Source) > filelib:last_modified(Target) of
-        true ->
-            true;
-        false ->
-            is_updated(RestFiles, ASNPath, GenPath)
-    end.
+    filelib:last_modified(Source) > filelib:last_modified(Target).
