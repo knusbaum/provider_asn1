@@ -4,7 +4,8 @@
   {registered, []},
   {applications,
    [kernel,
-    stdlib
+    stdlib,
+    providers
    ]},
   {env,[]},
   {modules, [provider_asn1]},
