@@ -26,8 +26,10 @@ init(State) ->
                     {compile_opts, $o, "compile_opts", binary,
                      "A comma-separated list of options to send to Erlang's ASN.1 compiler."},
                     {compile_order, $c, "compile_order", binary,
-                     "A comma-separated list of {wildcard | file | dir, string} the specific order "
-                     "to compile the ASN.1 files. {wildcard, \"**/*.asn1\"} as default"}
+                     "An Erlang term consisting of a tuple-list of the specific order "
+                     "to compile the ASN.1 files where the first tuple-element is "
+                     "one of `wildcard' | `file' | `dir' and the second the filename "
+                     "in string format. Defaults to `[{wildcard, \"**/*.asn1\"}]'."}
                    ]},
             {short_desc, "Compile ASN.1 with Rebar3"},
             {desc, "Compile ASN.1 with Rebar3"}
