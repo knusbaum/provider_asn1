@@ -121,14 +121,24 @@ to_recompile(State, ASNPath, GenPath) ->
 
 find_asn_files(State, BasePath) ->
     Order = provider_asn1_util:get_arg(State, compile_order),
-    lists:flatmap(fun ({wildcard, Wildcard}) ->
-                          [filename:join(BasePath, F) || F <- filelib:wildcard(Wildcard, BasePath)];
-                      ({file, File}) ->
-                          [filename:join(BasePath, File)];
-                      ({dir, Dir}) ->
-                          D = filename:join(BasePath, Dir),
-                          [filename:join(D, F) || F <- filelib:wildcard("*.asn1", D)]
-                  end, Order).
+    Fs = lists:flatmap(fun ({wildcard, Wildcard}) ->
+                               [filename:join(BasePath, F) || F <- filelib:wildcard(Wildcard, BasePath)];
+                           ({file, File}) ->
+                               [filename:join(BasePath, File)];
+                           ({dir, Dir}) ->
+                               D = filename:join(BasePath, Dir),
+                               [filename:join(D, F) || F <- filelib:wildcard("*.asn1", D)]
+                       end, Order),
+    uniq(Fs).
+
+-ifdef(OTP_RELEASE).
+  -if(?OTP_RELEASE >= 25).
+uniq(Fs) ->
+    lists:uniq(Fs).
+-else.
+uniq(Fs) ->
+    Fs.
+-endif.
 
 is_latest(ASNFileName, ASNPath, GenPath) ->
     Source = filename:join(ASNPath, ASNFileName),
