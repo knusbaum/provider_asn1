@@ -135,6 +135,10 @@ find_asn_files(State, BasePath) ->
   -if(?OTP_RELEASE >= 25).
 uniq(Fs) ->
     lists:uniq(Fs).
+  -elif(?OTP_RELEASE < 25).
+uniq(Fs) ->
+    Fs.
+  -endif.
 -else.
 uniq(Fs) ->
     Fs.
