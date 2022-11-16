@@ -5,7 +5,8 @@
 
 -define(PROVIDER, 'compile').
 -define(DEPS, [{default, app_discovery}]).
--define(DEFAULTS, [{verbose, false}, {encoding, ber}, {compile_opts, []}]).
+-define(DEFAULTS, [{verbose, false}, {encoding, ber}, {compile_opts, []},
+                   {compile_order, [{wildcard, "**/*.asn1"}]}]).
 
 %% ===================================================================
 %% Public API
@@ -22,7 +23,11 @@ init(State) ->
             % list of options understood by the plugin
             {opts, [{verbose, $v, "verbose", boolean, "Be Verbose."},
                     {encoding, $e, "encoding", atom, "The encoding to use (atom). ber by default."},
-                    {compile_opts, $o, "compile_opts", binary, "A comma-separated list of options to send to erlang's asn.1 compiler."}]},
+                    {compile_opts, $o, "compile_opts", binary, "A comma-separated list of options to send to Erlang's ASN.1 compiler."},
+                    {compile_order, $c, "compile_order", proplist,
+                     "A proplist [{wildcard | file | dir, string}] the specific order "
+                     "to compile the ASN.1 files. [{wildcard, \"**/*.asn1\"}] as default"}
+                   ]},
             {short_desc, "Compile ASN.1 with Rebar3"},
             {desc, "Compile ASN.1 with Rebar3"}
     ]),
@@ -61,7 +66,7 @@ process_app(State, AppPath) ->
     SrcPath = filename:join(AppPath, "src"),
     ensure_dir(State, SrcPath),
 
-    case to_recompile(ASNPath, GenPath) of
+    case to_recompile(State, ASNPath, GenPath) of
         [] ->
             ok;
         Asns ->
@@ -108,14 +113,22 @@ ensure_dir(State, Path) ->
             provider_asn1_util:verbose_out(State, "Making ~p ~p~n", [Path, file:make_dir(Path)])
     end.
 
-to_recompile(ASNPath, GenPath) ->
+to_recompile(State, ASNPath, GenPath) ->
     lists:filtermap(fun (File) ->
                             is_latest(File, ASNPath, GenPath)
                     end,
-                    find_asn_files(ASNPath)).
+                    find_asn_files(State, ASNPath)).
 
-find_asn_files(Path) ->
-    [filename:join(Path, F) || F <- filelib:wildcard("**/*.asn1", Path)].
+find_asn_files(State, BasePath) ->
+    Order = provider_asn1_util:get_arg(State, compile_order),
+    lists:flatmap(fun ({wildcard, Wildcard}) ->
+                          [filename:join(BasePath, F) || F <- filelib:wildcard(Wildcard, BasePath)];
+                      ({file, File}) ->
+                          [filename:join(BasePath, File)];
+                      ({dir, Dir}) ->
+                          D = filename:join(BasePath, Dir),
+                          [filename:join(D, F) || F <- filelib:wildcard("*.asn1", D)]
+                  end, Order).
 
 is_latest(ASNFileName, ASNPath, GenPath) ->
     Source = filename:join(ASNPath, ASNFileName),
