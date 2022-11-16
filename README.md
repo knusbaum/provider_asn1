@@ -97,8 +97,18 @@ They can be placed in your `rebar.config` file, or issued on the command line.
 
 The options are as follows:
  * `--verbose -v` Lots of output for debugging.
- * `--encoding -e` Pick the encoding used by the asn compiler. Options are `ber`, `per`, and `uper`. `ber` is the default.
- * `--compile_opts -o` A comma-separated list of options to send to erlang's asn.1 compiler. See http://erlang.org/doc/man/asn1ct.html#compile-2 for available options.
+ * `--encoding -e` Pick the encoding used by the asn compiler. Options
+   are `ber`, `per`, and `uper`. `ber` is the default.
+ * `--compile_opts -o` A comma-separated list of options to send to
+   Erlang's ASN.1 compiler. See
+   http://erlang.org/doc/man/asn1ct.html#compile-2 for available
+   options.
+ * `--compile_order -c` An Erlang term consisting of a tuple-list of
+   the specific order to compile the ASN.1 files where the first
+   tuple-element is one of `wildcard` | `file` | `dir` and the second
+   the filename in string format. Defaults to
+   `[{wildcard, \"**/*.asn1\"}]`.
+
 
 Example:
 ```
