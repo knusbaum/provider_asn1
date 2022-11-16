@@ -23,10 +23,11 @@ init(State) ->
             % list of options understood by the plugin
             {opts, [{verbose, $v, "verbose", boolean, "Be Verbose."},
                     {encoding, $e, "encoding", atom, "The encoding to use (atom). ber by default."},
-                    {compile_opts, $o, "compile_opts", binary, "A comma-separated list of options to send to Erlang's ASN.1 compiler."},
-                    {compile_order, $c, "compile_order", proplist,
-                     "A proplist [{wildcard | file | dir, string}] the specific order "
-                     "to compile the ASN.1 files. [{wildcard, \"**/*.asn1\"}] as default"}
+                    {compile_opts, $o, "compile_opts", binary,
+                     "A comma-separated list of options to send to Erlang's ASN.1 compiler."},
+                    {compile_order, $c, "compile_order", binary,
+                     "A comma-separated list of {wildcard | file | dir, string} the specific order "
+                     "to compile the ASN.1 files. {wildcard, \"**/*.asn1\"} as default"}
                    ]},
             {short_desc, "Compile ASN.1 with Rebar3"},
             {desc, "Compile ASN.1 with Rebar3"}
@@ -34,15 +35,30 @@ init(State) ->
     {ok, rebar_state:add_provider(State, Provider)}.
 
 resolve_special_args(PreState) ->
-    NewState = provider_asn1_util:resolve_args(PreState, ?DEFAULTS),
-    CompileOpts = provider_asn1_util:get_arg(NewState, compile_opts),
+    DefaultState = provider_asn1_util:resolve_args(PreState, ?DEFAULTS),
+    lists:foldl(fun (F, State) -> F(State) end,
+                DefaultState,
+                [fun resolve_compile_opts/1,
+                 fun resolve_compile_order/1]).
+
+resolve_compile_opts(State) ->
+    CompileOpts = provider_asn1_util:get_arg(State, compile_opts),
     if
         is_binary(CompileOpts) ->
             NewCompileOpts = lists:map(fun(X) ->
                                                binary_to_atom(X, utf8) end,
                                        re:split(CompileOpts, ",")),
-            provider_asn1_util:set_arg(NewState, compile_opts, NewCompileOpts);
-        true -> NewState
+            provider_asn1_util:set_arg(State, compile_opts, NewCompileOpts);
+        true -> State
+    end.
+resolve_compile_order(State) ->
+    CompileOrder = provider_asn1_util:get_arg(State, compile_order),
+    if
+        is_binary(CompileOrder) ->
+            {ok, Toks, _} = erl_scan:string(binary_to_list(CompileOrder) ++ "."),
+            {ok, NewCompileOrder} = erl_parse:parse_term(Toks),
+            provider_asn1_util:set_arg(State, compile_order, NewCompileOrder);
+        true -> State
     end.
 
 -spec do(rebar_state:t()) -> {ok, rebar_state:t()} | {error, string()}.
