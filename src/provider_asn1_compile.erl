@@ -5,7 +5,8 @@
 
 -define(PROVIDER, 'compile').
 -define(DEPS, [{default, app_discovery}]).
--define(DEFAULTS, [{verbose, false}, {encoding, ber}, {compile_opts, []}]).
+-define(DEFAULTS, [{verbose, false}, {encoding, ber}, {compile_opts, []},
+                   {compile_order, [{wildcard, "**/*.asn1"}]}]).
 
 %% ===================================================================
 %% Public API
@@ -22,7 +23,14 @@ init(State) ->
             % list of options understood by the plugin
             {opts, [{verbose, $v, "verbose", boolean, "Be Verbose."},
                     {encoding, $e, "encoding", atom, "The encoding to use (atom). ber by default."},
-                    {compile_opts, $o, "compile_opts", binary, "A comma-separated list of options to send to erlang's asn.1 compiler."},
+                    {compile_opts, $o, "compile_opts", binary,
+                     "A comma-separated list of options to send to Erlang's ASN.1 compiler."},
+                    {compile_order, $c, "compile_order", binary,
+                     "An Erlang term consisting of a tuple-list of the specific order "
+                     "to compile the ASN.1 files where the first tuple-element is "
+                     "one of `wildcard' | `file' | `dir' and the second the filename "
+                     "in string format. Defaults to `[{wildcard, \"**/*.asn1\"}]'."}
+                   ]},
                     {overrides, $O, "overrides", binary,
                      "An Erlang term [{file | re, string}, [Opt]}] with specific options."}]},
             {short_desc, "Compile ASN.1 with Rebar3"},
@@ -35,6 +43,7 @@ resolve_special_args(PreState) ->
     lists:foldl(fun (F, State) -> F(State) end,
                 DefaultState,
                 [fun resolve_compile_opts/1,
+                 fun resolve_compile_order/1,
                  fun resolve_compile_overrides/1
                 ]).
 
@@ -46,6 +55,15 @@ resolve_compile_opts(State) ->
                                                binary_to_atom(X, utf8) end,
                                        re:split(CompileOpts, ",")),
             provider_asn1_util:set_arg(State, compile_opts, NewCompileOpts);
+        true -> State
+    end.
+resolve_compile_order(State) ->
+    CompileOrder = provider_asn1_util:get_arg(State, compile_order),
+    if
+        is_binary(CompileOrder) ->
+            {ok, Toks, _} = erl_scan:string(binary_to_list(CompileOrder) ++ "."),
+            {ok, NewCompileOrder} = erl_parse:parse_term(Toks),
+            provider_asn1_util:set_arg(State, compile_order, NewCompileOrder);
         true -> State
     end.
 resolve_compile_overrides(State) ->
@@ -79,7 +97,7 @@ process_app(State, AppPath) ->
     SrcPath = filename:join(AppPath, "src"),
     ensure_dir(State, SrcPath),
 
-    case to_recompile(ASNPath, GenPath) of
+    case to_recompile(State, ASNPath, GenPath) of
         [] ->
             ok;
         Asns ->
@@ -126,14 +144,36 @@ ensure_dir(State, Path) ->
             provider_asn1_util:verbose_out(State, "Making ~p ~p~n", [Path, file:make_dir(Path)])
     end.
 
-to_recompile(ASNPath, GenPath) ->
+to_recompile(State, ASNPath, GenPath) ->
     lists:filtermap(fun (File) ->
                             is_latest(File, ASNPath, GenPath)
                     end,
-                    find_asn_files(ASNPath)).
+                    find_asn_files(State, ASNPath)).
 
-find_asn_files(Path) ->
-    [filename:join(Path, F) || F <- filelib:wildcard("**/*.asn1", Path)].
+find_asn_files(State, BasePath) ->
+    Order = provider_asn1_util:get_arg(State, compile_order),
+    Fs = lists:flatmap(fun ({wildcard, Wildcard}) ->
+                               [filename:join(BasePath, F) || F <- filelib:wildcard(Wildcard, BasePath)];
+                           ({file, File}) ->
+                               [filename:join(BasePath, File)];
+                           ({dir, Dir}) ->
+                               D = filename:join(BasePath, Dir),
+                               [filename:join(D, F) || F <- filelib:wildcard("*.asn1", D)]
+                       end, Order),
+    uniq(Fs).
+
+-ifdef(OTP_RELEASE).
+  -if(?OTP_RELEASE >= 25).
+uniq(Fs) ->
+    lists:uniq(Fs).
+  -elif(?OTP_RELEASE < 25).
+uniq(Fs) ->
+    Fs.
+  -endif.
+-else.
+uniq(Fs) ->
+    Fs.
+-endif.
 
 is_latest(ASNFileName, ASNPath, GenPath) ->
     Source = filename:join(ASNPath, ASNFileName),
