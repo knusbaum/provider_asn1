@@ -29,10 +29,10 @@ init(State) ->
                      "An Erlang term consisting of a tuple-list of the specific order "
                      "to compile the ASN.1 files where the first tuple-element is "
                      "one of `wildcard' | `file' | `dir' and the second the filename "
-                     "in string format. Defaults to `[{wildcard, \"**/*.asn1\"}]'."}
-                   ]},
+                     "in string format. Defaults to `[{wildcard, \"**/*.asn1\"}]'."},
                     {overrides, $O, "overrides", binary,
-                     "An Erlang term [{file | re, string}, [Opt]}] with specific options."}]},
+                     "An Erlang term [{file | re, string}, [Opt]}] with specific options."}
+                   ]},
             {short_desc, "Compile ASN.1 with Rebar3"},
             {desc, "Compile ASN.1 with Rebar3"}
     ]),
