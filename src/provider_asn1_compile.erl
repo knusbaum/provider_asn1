@@ -175,7 +175,7 @@ uniq(Fs) ->
     Fs.
 -endif.
 
-is_latest(State, ASNFileName, ASNPath, SrcPath) ->
+is_latest(_State, ASNFileName, ASNPath, SrcPath) ->
     Source = filename:join(ASNPath, ASNFileName),
     TargetFileName = provider_asn1_util:asn_basename(ASNFileName) ++ ".erl",
     Target = filename:join(SrcPath, TargetFileName),
